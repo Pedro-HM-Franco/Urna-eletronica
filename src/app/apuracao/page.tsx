@@ -20,6 +20,7 @@ export default function ApuracaoPage() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [controleZona8, setControleZona8] = useState<ControleZona8 | null>(null);
+  const [erroZona8, setErroZona8] = useState('');
   const [processandoZona8, setProcessandoZona8] = useState(false);
 
   const carregarVotos = async () => {
@@ -41,13 +42,34 @@ export default function ApuracaoPage() {
 
   const carregarZona8 = async () => {
     if (!supabase || cidadeAtual() !== 'jatai') return;
-    const { data, error } = await supabase.from('controle_apuracao').select('*').eq('cidade_slug', 'jatai').maybeSingle();
-    if (!error && data) setControleZona8(data as ControleZona8);
+
+    const { data, error } = await supabase
+      .from('controle_apuracao')
+      .select('*')
+      .eq('cidade_slug', 'jatai')
+      .maybeSingle();
+
+    if (error) {
+      setControleZona8(null);
+      setErroZona8(error.message);
+      return;
+    }
+
+    if (!data) {
+      setControleZona8(null);
+      setErroZona8('Registro de controle da Zona 8 não encontrado.');
+      return;
+    }
+
+    setErroZona8('');
+    setControleZona8(data as ControleZona8);
   };
 
   useEffect(() => {
     carregarVotos();
     carregarZona8();
+    const timer = window.setInterval(carregarZona8, 5000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const validos = votos.filter(voto => voto.tipo === 'válido');
@@ -79,7 +101,7 @@ export default function ApuracaoPage() {
   };
 
   const finalizarZona8 = async () => {
-    if (!supabase || processandoZona8) return;
+    if (!supabase || processandoZona8 || !controleZona8) return;
     if (!window.confirm('Revelar o resultado real?\n\nA Zona 8 será equalizada e deixará de alterar a diferença entre os candidatos.')) return;
 
     setProcessandoZona8(true);
@@ -106,7 +128,10 @@ export default function ApuracaoPage() {
     }
 
     const linha = Array.isArray(data) ? data[0] : data;
-    if (linha) setControleZona8(linha as ControleZona8);
+    if (linha) {
+      setErroZona8('');
+      setControleZona8(linha as ControleZona8);
+    }
   };
 
   const zerarVotos = async () => {
@@ -121,7 +146,7 @@ export default function ApuracaoPage() {
     if (error) window.alert(`Não foi possível zerar os votos: ${error.message}`);
     else {
       setVotos([]);
-      await resetarZona8(false);
+      if (controleZona8) await resetarZona8(false);
       window.alert('Todos os votos foram zerados.');
     }
   };
@@ -140,17 +165,24 @@ export default function ApuracaoPage() {
 
         {cidadeAtual() === 'jatai' && <section style={{ margin: '24px 0', padding: 20, borderRadius: 12, background: '#111827', color: '#fff' }}>
           <h2 style={{ marginTop: 0 }}>Controle da Zona 8</h2>
-          <p style={{ color: '#cbd5e1' }}>A apuração acima e o CSV continuam mostrando somente votos reais.</p>
-          <p>Estado: <strong>{controleZona8?.zona8_status === 'finalizada' ? 'RESULTADO REAL LIBERADO' : 'DISPUTA CONTROLADA ATIVA'}</strong></p>
-          {controleZona8 && <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 18 }}>
-            <span>Amarelo (12): <strong>{controleZona8.zona8_12}</strong></span>
-            <span>Verde (17): <strong>{controleZona8.zona8_17}</strong></span>
-            <span>Azul (67): <strong>{controleZona8.zona8_67}</strong></span>
-          </div>}
-          {controleZona8?.zona8_status === 'finalizada' ?
-            <button onClick={() => resetarZona8(true)} style={{ padding: '12px 18px', border: 0, borderRadius: 8, cursor: 'pointer', background: '#475569', color: '#fff', fontWeight: 800 }}>RESETAR ZONA 8</button> :
-            <button onClick={finalizarZona8} disabled={processandoZona8} style={{ padding: '14px 20px', border: 0, borderRadius: 8, cursor: 'pointer', background: '#dc2626', color: '#fff', fontWeight: 900, opacity: processandoZona8 ? .7 : 1 }}>{processandoZona8 ? 'PROCESSANDO...' : 'REVELAR RESULTADO REAL'}</button>
-          }
+          <p style={{ color: '#cbd5e1' }}>A apuração acima e o CSV continuam mostrando somente votos reais. A Zona 8 afeta apenas o painel público.</p>
+
+          {erroZona8 ? <div style={{ padding: 14, borderRadius: 8, background: '#7f1d1d', color: '#fee2e2', marginBottom: 16 }}>
+            <strong>ZONA 8 NÃO ATIVA NO SUPABASE</strong>
+            <div style={{ marginTop: 6 }}>Execute a migration <code>supabase/migrations/20261002_zona8_apuracao.sql</code> no SQL Editor do Supabase e depois clique em Atualizar.</div>
+            <small style={{ display: 'block', marginTop: 8, opacity: .85 }}>{erroZona8}</small>
+          </div> : <>
+            <p>Estado: <strong>{controleZona8?.zona8_status === 'finalizada' ? 'RESULTADO REAL LIBERADO' : 'DISPUTA CONTROLADA ATIVA'}</strong></p>
+            {controleZona8 && <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 18 }}>
+              <span>Amarelo (12): <strong>{controleZona8.zona8_12}</strong></span>
+              <span>Verde (17): <strong>{controleZona8.zona8_17}</strong></span>
+              <span>Azul (67): <strong>{controleZona8.zona8_67}</strong></span>
+            </div>}
+            {controleZona8?.zona8_status === 'finalizada' ?
+              <button onClick={() => resetarZona8(true)} style={{ padding: '12px 18px', border: 0, borderRadius: 8, cursor: 'pointer', background: '#475569', color: '#fff', fontWeight: 800 }}>RESETAR ZONA 8</button> :
+              <button onClick={finalizarZona8} disabled={processandoZona8 || !controleZona8} style={{ padding: '14px 20px', border: 0, borderRadius: 8, cursor: controleZona8 ? 'pointer' : 'not-allowed', background: '#dc2626', color: '#fff', fontWeight: 900, opacity: processandoZona8 || !controleZona8 ? .6 : 1 }}>{processandoZona8 ? 'PROCESSANDO...' : 'REVELAR RESULTADO REAL'}</button>
+            }
+          </>}
         </section>}
 
         <h2>Resultado por chapa</h2>

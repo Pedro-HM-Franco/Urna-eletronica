@@ -7,7 +7,7 @@ import MapaIgreja from './MapaIgreja';
 import { dados } from '@/app/model/dados';
 import { dadosGoiania } from '@/app/model/dadosGoiania';
 import { aplicarIntensidade, corHexDaChapa, obterRegiaoDoDiscipulado, regioesJatai } from '@/app/lib/regioesJatai';
-import { calcularZona8Exibida, ControleZona8, revelacaoZona8Concluida } from '@/app/lib/zona8';
+import { calcularZona8Exibida, ControleZona8 } from '@/app/lib/zona8';
 
 type Voto = { numero: number | null; nome: string; chapa: string; cor: string; tipo: string; discipulado: string | null };
 type Grupo = { numero: number; nome: string; chapa: string; cor: string; total: number };
@@ -71,7 +71,10 @@ export default function GraficoPage() {
           p_real_17: contar(17),
           p_real_67: contar(67),
         });
-        if (!error && estado) {
+
+        if (error) {
+          console.warn('Zona 8 indisponível:', error.message);
+        } else if (estado) {
           const linha = Array.isArray(estado) ? estado[0] : estado;
           if (linha) setControleZona8(linha as ControleZona8);
         }
@@ -195,13 +198,6 @@ export default function GraficoPage() {
   });
 
   const coresMapaVencedoras = modoSuspense ? coresMapaDemo : resultadosRegioes.map(regiao => regiao.corMapa);
-  const zona8Ordenada = cidade === 'jatai' ? [
-    { numero: 12, cor: 'Amarelo', total: votosZona8[12] },
-    { numero: 17, cor: 'Verde', total: votosZona8[17] },
-    { numero: 67, cor: 'Azul', total: votosZona8[67] },
-  ].sort((a, b) => b.total - a.total) : [];
-  const zona8Empatada = zona8Ordenada.length > 1 && zona8Ordenada[0].total === zona8Ordenada[1].total;
-  const corZona8 = zona8Empatada || !zona8Ordenada.length ? '#64748b' : corDaChapa(zona8Ordenada[0].cor);
   const candidatosVersiculo = cidade === 'goiania'
     ? [{ numero: 88, nome: 'Lucas Ganzerli', cor: '#d7ff00' }, { numero: 75, nome: 'Samuel', cor: '#7cff00' }, { numero: 67, nome: 'Maria Eduarda', cor: '#18bfff' }]
     : [{ numero: 12, nome: 'Lauanny', cor: '#c28b00' }, { numero: 17, nome: 'Manu', cor: '#168a45' }, { numero: 67, nome: 'João Arthur', cor: '#2563c7' }];
@@ -217,7 +213,7 @@ export default function GraficoPage() {
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 18, maxWidth: 760, marginBottom: 44 }}>
       {[['VOTOS VÁLIDOS', validosExibidos], ['BRANCOS', modoSuspense ? '—' : votos.filter(v => v.tipo === 'branco').length], ['NULOS', modoSuspense ? '—' : votos.filter(v => v.tipo === 'nulo').length]].map(([titulo, total]) => <div key={String(titulo)} style={{ padding: '22px 26px', border: '1px solid #33416e', background: '#131b35cc', borderRadius: 18 }}><div style={{ color: '#aab7e8', fontSize: 13, letterSpacing: 2 }}>{titulo}</div><strong style={{ display: 'block', fontSize: 52, marginTop: 5 }}>{total}</strong></div>)}
     </section>
-    {cidade === 'jatai' && <section style={{ marginBottom: 48 }}><h2 style={{ fontSize: 28, marginBottom: 18 }}>Planta da igreja · Jataí</h2><div style={{ maxWidth: 940, margin: '0 auto', background: '#10182f', border: '1px solid #33416e', borderRadius: 22, padding: 18 }}><MapaIgreja cores={coresMapaVencedoras.length ? coresMapaVencedoras : Array(7).fill('#334155')} /><div style={{ display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap', color: '#c7d2fe', fontSize: 14 }}>{regioesJatai.map((regiao, index) => { const resultado = resultadosRegioes[index]; return <span key={regiao.id} title={resultado ? `${resultado.total} votos · margem ${Math.round(resultado.margem * 100)}%` : undefined}><b style={{ color: coresMapaVencedoras[index] || '#334155' }}>●</b> {regiao.id}. {regiao.nome}</span>; })}</div>{!modoSuspense && <div style={{ marginTop: 18, padding: 16, borderRadius: 14, border: `2px solid ${corZona8}`, background: '#0b1228', transition: 'border-color 1s' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><strong>8. Zona 8</strong><span style={{ color: controleZona8?.zona8_status === 'finalizada' ? (revelacaoZona8Concluida(controleZona8, agoraZona8) ? '#86efac' : '#facc15') : '#93c5fd', fontSize: 13, fontWeight: 800 }}>{controleZona8?.zona8_status === 'finalizada' ? (revelacaoZona8Concluida(controleZona8, agoraZona8) ? '● APURAÇÃO CONCLUÍDA' : '● FECHANDO') : '● EM APURAÇÃO'}</span></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 10, marginTop: 12 }}>{[{ numero: 12, cor: 'Amarelo', total: votosZona8[12] }, { numero: 17, cor: 'Verde', total: votosZona8[17] }, { numero: 67, cor: 'Azul', total: votosZona8[67] }].map(item => <div key={item.numero} style={{ padding: 10, borderRadius: 10, textAlign: 'center', background: '#111827', border: `1px solid ${corDaChapa(item.cor)}` }}><strong style={{ color: corDaChapa(item.cor) }}>{item.numero}</strong><div style={{ fontSize: 24, fontWeight: 900, marginTop: 2 }}>{item.total}</div></div>)}</div></div>}</div></section>}
+    {cidade === 'jatai' && <section style={{ marginBottom: 48 }}><h2 style={{ fontSize: 28, marginBottom: 18 }}>Planta da igreja · Jataí</h2><div style={{ maxWidth: 940, margin: '0 auto', background: '#10182f', border: '1px solid #33416e', borderRadius: 22, padding: 18 }}><MapaIgreja cores={coresMapaVencedoras.length ? coresMapaVencedoras : Array(7).fill('#334155')} /><div style={{ display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap', color: '#c7d2fe', fontSize: 14 }}>{regioesJatai.map((regiao, index) => { const resultado = resultadosRegioes[index]; return <span key={regiao.id} title={resultado ? `${resultado.total} votos · margem ${Math.round(resultado.margem * 100)}%` : undefined}><b style={{ color: coresMapaVencedoras[index] || '#334155' }}>●</b> {regiao.id}. {regiao.nome}</span>; })}</div></div></section>}
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 42, alignItems: 'end' }}>
       <div><h2 style={{ fontSize: 28, marginBottom: 24 }}>Percentual por chapa</h2><div style={{ display: 'grid', gap: 24 }}>{gruposExibidos.map(grupo => { const percentual = Math.round((grupo.total / totalGrafico) * 100); const foto = fotoDaChapa(grupo.numero, cidade); return <div key={grupo.numero} style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: 16, alignItems: 'center' }}>{foto ? <img src={caminhoFoto(cidade, foto)} alt={`Foto de ${grupo.nome}`} style={{ width: 76, height: 76, borderRadius: '50%', objectFit: 'cover', border: `3px solid ${corDaChapa(grupo.cor)}`, boxShadow: `0 0 18px ${corDaChapa(grupo.cor)}88` }} /> : <div /> }<div><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 9 }}><span style={{ fontSize: 20 }}><strong>{grupo.numero}</strong> · {grupo.nome} <small style={{ color: '#aab7e8' }}>({grupo.chapa})</small></span><strong style={{ fontSize: 26 }}>{percentual}%</strong></div><div style={{ height: 18, background: '#202a4b', borderRadius: 20, overflow: 'hidden' }}><div style={{ width: `${percentual}%`, height: '100%', background: corDaChapa(grupo.cor), borderRadius: 20, transition: 'width 1.2s' }} /></div></div></div>; })}</div>{gruposExibidos.length === 0 && <p style={{ color: '#aab7e8' }}>Aguardando os primeiros votos...</p>}</div>
       <div style={{ height: 430, position: 'relative', borderBottom: '2px solid #41517e', borderLeft: '1px solid #26345d', overflow: 'hidden' }}>{gruposExibidos.flatMap((grupo, grupoIndex) => Array.from({ length: Math.min(grupo.total, 28) }, (_, i) => { const foto = fotoDaChapa(grupo.numero, cidade); return foto ? <img key={`${grupo.numero}-${i}`} src={caminhoFoto(cidade, foto)} alt="" className="bolha" style={{ left: `${10 + ((i * 29 + grupoIndex * 17) % 80)}%`, width: 52 + ((i * 7) % 16), height: 52 + ((i * 7) % 16), objectFit: 'cover', border: `4px solid ${corDaChapa(grupo.cor)}`, boxShadow: `0 0 24px ${corDaChapa(grupo.cor)}`, animationDelay: `${-(i * .35)}s`, animationDuration: `${4.5 + (i % 3)}s` }} /> : null; }))}<div style={{ position: 'absolute', bottom: 14, width: '100%', textAlign: 'center', color: '#aab7e8', fontSize: 13 }}>VOTOS SUBINDO</div></div>
